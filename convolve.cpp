@@ -1,10 +1,14 @@
 /*  Include files  */
 #include <stdio.h>
 #include <iostream>
-
+#include <math.h>
+#define SIZE       8
+#define PI         3.141592653589793
+#define TWO_PI     (2.0 * PI)
+#define SWAP(a,b)  tempr=(a);(a)=(b);(b)=tempr
 using namespace std;
-
-typede struct HEADER
+/*
+typedef struct HEADER
 {
 	char RIFF[4];
 	unsigned long 	chunkSize;
@@ -13,8 +17,13 @@ typede struct HEADER
 	unsigned long	subchunk1Size;
 	unsigned short	AudioFormat;
 	unsigned short Channels;
-	
-}
+	unsigned long  SamplesPerSec;
+	unsigned long bytesperSec;
+	unsigned short blockAlign;
+	unsigned short bitsPerSample;
+	char	subChunk2ID[4];
+	unsigned long subChunk2Size;
+}wav_hdr;*/
 
 
 /*  Function prototypes  */
@@ -34,8 +43,24 @@ int main(void)
 {
   float input_signal[100], impulse_response[20], output_signal[120];
   int input_size, impulse_size, output_size;
+  Cwave input, Holder;
 
-	
+/*	wav_hdr wavHeader;
+	FILE *wavfile; 
+	int headerSize = sizeof(wav_hdr);
+	int filelength=0;*/
+	cout<<"what is the file name of the input sound?"<<endl;
+	cin >> input;
+	cin.get();
+	cout<<input<<endl;
+	/*wavfile=fopen(input);
+		Holder.Mix(input);
+		Holder.Play();
+		
+	*/
+
+
+
   /*  Create an example input signal  */
   input_signal[0] = 1.0;
   input_signal[1] = 0.5;
@@ -169,6 +194,57 @@ int main(void)
   return 0;
 }
 
+/*this code is taken from code provided by Prof. Manzara*/
+void method(double data[], int nn, int isign)
+{
+    unsigned long n, mmax, m, j, istep, i;
+    double wtemp, wr, wpr, wpi, wi, theta;
+    double tempr, tempi;
+
+    n = nn << 1;
+    j = 1;
+
+    for (i = 1; i < n; i += 2) 
+	{
+		if (j > i) 
+		{
+			SWAP(data[j], data[i]);
+			SWAP(data[j+1], data[i+1]);
+		}
+		m = nn;
+		while (m >= 2 && j > m) 
+		{
+			j -= m;
+			m >>= 1;
+		}
+		j += m;
+    }
+
+    mmax = 2;
+    while (n > mmax) {
+	istep = mmax << 1;
+	theta = isign * (6.28318530717959 / mmax);
+	wtemp = sin(0.5 * theta);
+	wpr = -2.0 * wtemp * wtemp;
+	wpi = sin(theta);
+	wr = 1.0;
+	wi = 0.0;
+	for (m = 1; m < mmax; m += 2) {
+	    for (i = m; i <= n; i += istep) {
+		j = i + mmax;
+		tempr = wr * data[j] - wi * data[j+1];
+		tempi = wr * data[j+1] + wi * data[j];
+		data[j] = data[i] - tempr;
+		data[j+1] = data[i+1] - tempi;
+		data[i] += tempr;
+		data[i+1] += tempi;
+	    }
+	    wr = (wtemp = wr) * wpr - wi * wpi + wr;
+	    wi = wi * wpr + wtemp * wpi + wi;
+	}
+	mmax = istep;
+    }
+}
 
 
 /*****************************************************************************
