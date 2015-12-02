@@ -1,6 +1,13 @@
+//important note everywhere it says SizeOfChunk2 is wrong Laura
+
+
 /*  Include files  */
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <unistd.h>
 #include <iostream>
+#include <string.h>
 #include <math.h>
 #define SIZE       8
 #define PI         3.141592653589793
@@ -11,7 +18,25 @@ using namespace std;
 char * inFile;
 char * InputResponse;
 char * outFile;
+int inFileSize=0;
+int sizeOfSignal=0;
 
+
+typedef struct header_file
+{
+    char chunk_id[4];
+    int chunk_size;
+    char format[4];
+    char subchunk1_id[4];
+    int subchunk1_size;
+    short int audio_format;
+    short int num_channels;		// number of channels i.e 1-mono 2-stereo
+    int sample_rate;			// sample_rate denotes the sampling rate.
+    int byte_rate;
+    short int block_align;
+    short int bits_per_sample;		// number of bits per sample
+} header;
+typedef struct header_file* header_p;
 
 /*  Function prototypes  */
 void convolve(float x[], int N, float h[], int M, float y[], int P);
@@ -154,20 +179,66 @@ void print_vector(char *title, float x[], int N)
 */
 void reader(char * in, char * inResponse)
 {
-	FILE * input=fopen(in, "rb"); //reading the file in binary
+	cout<<"reader"<<endl;
+	FILE * input=fopen(in, "rb"); 						//reading the file in binary
+	
+	header_p head= (header_p)malloc(sizeof(header));
+	
+	if(in == NULL)
+	{
+		//do something
+	}
+	else
+	{
+		fseek(input, 0, SEEK_END);
+		inFileSize=ftell(input);						//length of input file
+		rewind(input);
+		
+		char * fileContent= (char *) malloc (inFileSize);
+		fread(fileContent, inFileSize, 1, input);			//read input file
+		rewind(input);
+		
+		fread(head, 1, sizeof(head), input);			//get header info
+		int a=0;
+		for(int i=0;i<inFileSize-5;i++)
+		{
+			if(fileContent[i]=='d' && fileContent[i+1]=='a' && fileContent[i+2]=='t' && fileContent[i+3]==fileContent[i+1])
+			{
+				a=i+4;
+			}
+		}
+		fseek(input, a, SEEK_SET);
+		char * SizeOfChunk2;
+		fread(SizeOfChunk2, 4,1, input);
+		
+		fseek(input, a+4, SEEK_SET);
+		char * data= (char*)malloc(sizeof(SizeOfChunk2));
+		fread(data,sizeof(SizeOfChunk2),1,input);
+		fclose(input);
+		
+		short * smokeSignal = (short*)malloc(sizeof(SizeOfChunk2));
+		int lengthSmokeSignal=sizeof(SizeOfChunk2)/2;
+		for(int j=0; j<sizeOfSignal;j++)
+		{
+			short half= (short) ((unsigned char) sizeof(SizeOfChunk2));
+			short otherHalf=(short)((unsigned char)sizeof(SizeofChunk2));
+		}			
+	}
 }
 
 
 int main(int argc, char ** argv)
 {
+	cout<<"main"<<endl;
 	if(argc<4)
 	{
 		return 0;
 	}
 	inFile=argv[1];
-	InputResponse=argv[2];
-	outFile=argv[3];
+	outFile=argv[2];
+	InputResponse=argv[3];
 	
-	//method for reading Input
+	reader(inFile, InputResponse);
+	
 	return 0;
 }
