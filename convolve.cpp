@@ -12,12 +12,13 @@
 #include <stdlib.h>
 #include<math.h>
 #include<iostream>
+
+
 using namespace std;
 
 char chunkID[5];
 int chunkSize;
 char format[5];
-
 char subChunk1ID[5];
 int subChunk1Size;
 short audioFormat;
@@ -26,12 +27,28 @@ int sampleRate;
 int byteRate;
 short blockAlign;
 short bitsPerSample;
-
 int channelSize;
 char subChunk2ID[5];
 int subChunk2Size;
-
 short* data;
+int numSamples;
+
+char chunkIDIR[5];
+int chunkSizeIR;
+char formatIR[5];
+char subChunk1IDIR[5];
+int subChunk1SizeIR;
+short audioFormatIR;
+short numChannelsIR;
+int sampleRateIR;
+int byteRateIR;
+short blockAlignIR;
+short bitsPerSampleIR;
+int channelSizeIR;
+char subChunk2IDIR[5];
+int subChunk2SizeIR;
+short* dataIR;
+int numSamplesIR;
 
 void print()
 {
@@ -54,11 +71,13 @@ void print()
 	printf(" bitsPerSample:%d\n", bitsPerSample);
 	printf(" subChunk2ID:%s\n", subChunk2ID);
 	printf(" subChunk2Size:%d\n", subChunk2Size);
+	cout<<" "<<endl;
 }
 
-int loadWave(char* filename)
+int loadWave(char* filename, char* response)
 {
 	FILE* in = fopen(filename, "rb");
+	FILE* inResp = fopen(response, "rb");
 
 	if (in != NULL)
 	{		
@@ -91,7 +110,7 @@ int loadWave(char* filename)
 
 		//read data		
 		int bytesPerSample = bitsPerSample/8;
-		int numSamples = subChunk2Size / bytesPerSample;
+		numSamples = subChunk2Size / bytesPerSample;
 		data = (short*) malloc(sizeof(short) * numSamples);
 		
 		//fread(data, 1, bytesPerSample*numSamples, in);
@@ -110,6 +129,58 @@ int loadWave(char* filename)
 	else
 	{
 		printf("Can't open file\n");
+		return 0;
+	}
+	if (inResp != NULL)
+	{		
+		printf("Reading %s...\n",filename);
+
+		fread(chunkIDIR, 1, 4, inResp);
+		fread(&chunkSizeIR, 1, 4, inResp);
+		fread(formatIR, 1, 4, inResp);
+
+		//sub chunk 1
+		fread(subChunk1IDIR, 1, 4, inResp);
+		fread(&subChunk1SizeIR, 1, 4, inResp);
+		fread(&audioFormatIR, 1, 2, inResp);
+		fread(&numChannelsIR, 1, 2, inResp);
+		fread(&sampleRateIR, 1, 4, inResp);
+		fread(&byteRateIR, 1, 4, inResp);
+		fread(&blockAlignIR, 1, 2, inResp);
+		fread(&bitsPerSampleIR, 1, 2, inResp);		
+		
+		//read extra bytes
+		if(subChunk1SizeIR == 18)
+		{
+			short emptyIR;
+			fread(&emptyIR, 1, 2, inResp);		
+		}
+		
+		//sub chunk 2
+		fread(subChunk2IDIR, 1, 4, inResp);
+		fread(&subChunk2SizeIR, 1, 4, inResp);
+
+		//read data		
+		int bytesPerSampleIR = bitsPerSampleIR/8;
+		numSamplesIR = subChunk2SizeIR / bytesPerSampleIR;
+		dataIR = (short*) malloc(sizeof(short) * numSamplesIR);
+		
+		//fread(data, 1, bytesPerSample*numSamples, in);
+		
+		int i=0;
+		short sampleIR=0;
+		while(fread(&sampleIR, 1, bytesPerSampleIR, inResp) == bytesPerSampleIR)
+		{		
+			dataIR[i++] = sampleIR;
+			sampleIR = 0;			
+		}
+		
+		fclose(inResp);
+		printf("Closing %s...\n",inResp);
+	}
+	else
+	{
+		printf("Can't open response file\n");
 		return 0;
 	}
 	return 1;
@@ -150,17 +221,17 @@ void four1(double data[], int nn, int isign)
 		istep = mmax << 1;
 		theta = isign * (6.28318530717959 / mmax);
 		wtemp = sin(0.5 * theta);
-		wpr = -2.0 * wtemp * wtemp;
+		wpr = -2.0 * wtemp * wtemp;			//Laura Optimize (can i just calculate this each time? is that better?)
 		wpi = sin(theta);
 		wr = 1.0;
 		wi = 0.0;
-		for (m = 1; m < mmax; m += 2) 
+		for (m = 1; m < mmax; m += 2)  		//Laura Optimize (this seems to loop only once why is it here?
 		{
-			for (i = m; i <= n; i += istep) 
+			for (i = m; i <= n; i += istep)  //Laura Optimize (can this be combined with the for loop above)
 			{
 				j = i + mmax;
 				tempr = wr * data[j] - wi * data[j+1];
-				tempi = wr * data[j+1] + wi * data[j];
+				tempi = wr * data[j+1] + wi * data[j];// Laura Optimize (can i change this to only use one temp variable)
 				data[j] = data[i] - tempr;
 				data[j+1] = data[i+1] - tempi;
 				data[i] += tempr;
@@ -213,25 +284,25 @@ int saveWave(char* filename)
 		
 		//impulse response - echo
 		int IRSize = 6;
-		float IR[IRSize];
+		/*float IR[IRSize];
 		IR[0] = 1.0;
 		IR[1] = 1.0;
 		IR[2] = 1.0;
 		IR[3] = 1.0;
 		IR[4] = 1.0;
-		IR[5] = 1.0;
+		IR[5] = 1.0;*/
 		
 		//write the data
-		double* newData = (double*) malloc(sizeof(double) * (sampleCount + IRSize - 1));
+		double* newData = (double*) malloc(sizeof(double) * (numSamples+numSamplesIR-1));
 		double maxSample = -1;
 		double MAX_VAL = 32767.f;	//FIXME: find based on bits per sample
 		clock_t start=clock();
-		four1(newData, (int)IRSize, (int)sampleCount);		
-		/*for(int i=0; i<sampleCount; ++i)
+		four1(newData, (int)numSamplesIR, (int)numSamples);		
+		/*for(int i=0; i<numSamples; ++i)
 		{			
 			//convolve
-			for(int j=0; j<IRSize; ++j)
-				newData[i+j] += ((float)data[i] / MAX_VAL) * IR[j];
+			for(int j=0; j<numSamplesIR; ++j)
+				newData[i+j] += ((float)data[i] / MAX_VAL) * dataIR[j];
 			
 			//Keep track of max value for scaling
 			if(i==0)
@@ -240,10 +311,9 @@ int saveWave(char* filename)
 				maxSample = newData[i];
 		}*/
 		clock_t convolveTime=clock()-start;
-		cout<<"time to convolve: ";
+		cout<<"\ntime to convolve: ";
 		cout<<convolveTime;
 		cout<<" cycles\n"<<endl;
-		
 		//scale and re write the data
 		for(int i=0; i<sampleCount + IRSize - 1; ++i)
 		{
@@ -268,8 +338,10 @@ int saveWave(char* filename)
 int main(int argc, char* argv[])
 {
 	char* filename = argv[1];
+	char* response= argv[2];
+	char* outputFile=argv[3];
 	clock_t start=clock();
-	if(loadWave(filename))
+	if(loadWave(filename, response))
 		print();
 	clock_t loadedFileTime=clock()-start;
 	cout <<"time to load file: ";
