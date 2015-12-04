@@ -1,3 +1,13 @@
+/*
+*	name: Laura Berry
+* 	ID: 10111166
+*	Class: 501 L01
+*	this code is taken in part from code given in lecture and tutorial 
+*/
+
+
+#include <sys/time.h>
+#include<ctime>
 #include <stdio.h>
 #include <stdlib.h>
 #include<math.h>
@@ -191,70 +201,16 @@ int saveWave(char* filename)
 	return 1;
 }
 
-void method(double data[], int nn, int isign)
-{
-    unsigned long n, mmax, m, j, istep, i;
-    double wtemp, wr, wpr, wpi, wi, theta;
-    double tempr, tempi;
-
-    n = nn << 1;
-    j = 1;
-
-    for (i = 1; i < n; i += 2) 
-	{
-		if (j > i) 
-		{
-			double holder=data[j];
-			data[j]=data[i];
-			data[i]=holder;
-			holder=data[j+1];
-			data[j+1]=data[i+1];
-			data[i+1]=holder;
-		}
-		m = nn;
-		while (m >= 2 && j > m) 
-		{
-			j -= m;
-			m >>= 1;
-		}
-		j += m;
-    }
-
-    mmax = 2;
-    while (n > mmax) {
-	istep = mmax << 1;
-	theta = isign * (6.28318530717959 / mmax);
-	wtemp = sin(0.5 * theta);
-	wpr = -2.0 * wtemp * wtemp;
-	wpi = sin(theta);
-	wr = 1.0;
-	wi = 0.0;
-	for (m = 1; m < mmax; m += 2) 
-	{
-	    for (i = m; i <= n; i += istep)
-		{
-			j = i + mmax;
-			tempr = wr * data[j] - wi * data[j+1];
-			tempi = wr * data[j+1] + wi * data[j];
-			data[j] = data[i] - tempr;
-			data[j+1] = data[i+1] - tempi;
-			data[i] += tempr;
-			data[i+1] += tempi;
-	    }
-	    wr = (wtemp = wr) * wpr - wi * wpi + wr;
-	    wi = wi * wpr + wtemp * wpi + wi;
-	}
-		mmax = istep;
-    }
-}
-
 int main(int argc, char* argv[])
 {
 	char* filename = argv[1];
-	
+	clock_t start=clock();
 	if(loadWave(filename))
 		print();
-	
+	clock_t loadedFileTime=clock()-start;
+	cout <<"time to load file: ";
+	cout<<loadedFileTime;
+	cout<<" cycles"<<endl;
 	saveWave("out.wav");
 	free(data);
 }
