@@ -115,6 +115,65 @@ int loadWave(char* filename)
 	return 1;
 }
 
+void four1(double data[], int nn, int isign)
+{
+    unsigned long n, mmax, m, j, istep, i;
+    double wtemp, wr, wpr, wpi, wi, theta;
+    double tempr, tempi;
+
+    n = nn << 1;
+    j = 1;
+
+    for (i = 1; i < n; i += 2) 
+	{
+		if (j > i) 
+		{
+			double holder=data[j];
+			data[j]=data[i];
+			data[i]=data[j];
+			holder=data[j+1];
+			data[j+1]=data[i+1];
+			data[i+1]=data[j+1];
+		}
+		m = nn;
+		while (m >= 2 && j > m) 
+		{
+			j -= m;
+			m >>= 1;
+		}
+		j += m;
+    }
+
+    mmax = 2;
+    while (n > mmax) 
+	{
+		istep = mmax << 1;
+		theta = isign * (6.28318530717959 / mmax);
+		wtemp = sin(0.5 * theta);
+		wpr = -2.0 * wtemp * wtemp;
+		wpi = sin(theta);
+		wr = 1.0;
+		wi = 0.0;
+		for (m = 1; m < mmax; m += 2) 
+		{
+			for (i = m; i <= n; i += istep) 
+			{
+				j = i + mmax;
+				tempr = wr * data[j] - wi * data[j+1];
+				tempi = wr * data[j+1] + wi * data[j];
+				data[j] = data[i] - tempr;
+				data[j+1] = data[i+1] - tempi;
+				data[i] += tempr;
+				data[i+1] += tempi;
+			}
+			wr = (wtemp = wr) * wpr - wi * wpi + wr;
+			wi = wi * wpr + wtemp * wpi + wi;
+		}
+		mmax = istep;
+    }
+}
+
+
 int saveWave(char* filename)
 {
 	FILE* out = fopen(filename, "wb");
@@ -163,11 +222,12 @@ int saveWave(char* filename)
 		IR[5] = 1.0;
 		
 		//write the data
-		float* newData = (float*) malloc(sizeof(float) * (sampleCount + IRSize - 1));
-		float maxSample = -1;
-		float MAX_VAL = 32767.f;	//FIXME: find based on bits per sample
-			
-		for(int i=0; i<sampleCount; ++i)
+		double* newData = (double*) malloc(sizeof(double) * (sampleCount + IRSize - 1));
+		double maxSample = -1;
+		double MAX_VAL = 32767.f;	//FIXME: find based on bits per sample
+		clock_t start=clock();
+		four1(newData, (int)IRSize, (int)sampleCount);		
+		/*for(int i=0; i<sampleCount; ++i)
 		{			
 			//convolve
 			for(int j=0; j<IRSize; ++j)
@@ -178,7 +238,11 @@ int saveWave(char* filename)
 				maxSample = newData[0];
 			else if(newData[i] > maxSample)
 				maxSample = newData[i];
-		}		
+		}*/
+		clock_t convolveTime=clock()-start;
+		cout<<"time to convolve: ";
+		cout<<convolveTime;
+		cout<<" cycles\n"<<endl;
 		
 		//scale and re write the data
 		for(int i=0; i<sampleCount + IRSize - 1; ++i)
