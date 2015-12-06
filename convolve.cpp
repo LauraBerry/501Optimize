@@ -194,9 +194,16 @@ void four1(double data[], int nn, int isign)
 
     n = nn << 1;
     j = 1;
-
-    for (i = 1; i < n; i += 2) 
+    mmax = 2;
+    while (n > mmax) 
 	{
+		istep = mmax << 1;
+		theta = isign * (6.28318530717959 / mmax);
+		wtemp = sin(0.5 * theta);
+		wpr = -2.0 * wtemp*wtemp;
+		wpi = sin(theta);
+		wr = 1.0;
+		wi = 0.0;
 		if (j > i) 
 		{
 			double holder=data[j];
@@ -213,37 +220,68 @@ void four1(double data[], int nn, int isign)
 			m >>= 1;
 		}
 		j += m;
-    }
-
-    mmax = 2;
-    while (n > mmax) 
-	{
-		istep = mmax << 1;
-		theta = isign * (6.28318530717959 / mmax);
-		wtemp = sin(0.5 * theta);
-		wpr = -2.0 * wtemp * wtemp;			//Laura Optimize (can i just calculate this each time? is that better?)
-		wpi = sin(theta);
-		wr = 1.0;
-		wi = 0.0;
-		for (m = 1; m < mmax; m += 2)  		//Laura Optimize (this seems to loop only once why is it here?
+		for (i = m; i <= n; i += istep) 
 		{
-			for (i = m; i <= n; i += istep)  //Laura Optimize (can this be combined with the for loop above)
-			{
-				j = i + mmax;
-				tempr = wr * data[j] - wi * data[j+1];
-				tempi = wr * data[j+1] + wi * data[j];// Laura Optimize (can i change this to only use one temp variable)
-				data[j] = data[i] - tempr;
-				data[j+1] = data[i+1] - tempi;
-				data[i] += tempr;
-				data[i+1] += tempi;
-			}
-			wr = (wtemp = wr) * wpr - wi * wpi + wr;
-			wi = wi * wpr + wtemp * wpi + wi;
+			j = i + mmax;
+			tempr = wr * data[j] - wi * data[j+1];
+			tempi = wr * data[j+1] + wi * data[j];
+			data[j] = data[i] - tempr;
+			data[j+1] = data[i+1] - tempi;
+			data[i] += tempr;
+			data[i+1] += tempi;
 		}
+		wr = (wtemp = wr) * wpr - wi * wpi + wr;
+		wi = wi * wpr + wtemp * wpi + wi;
 		mmax = istep;
     }
 }
 
+double * convolve_d(double signal[], int numOfSamples, double responseArr[], int sizeResponseArr)
+{
+
+  /*  Do the convolution  */
+	 double * convolvedSignal;
+	 double * convolvedResponse;
+	 double * output;
+	 
+	 int i_power = (int)pow(2, (int) log2(numOfSamples) + 1);
+	 int i_power_2 = 2 * i_power; 
+	 convolvedResponse = (double *) malloc(i_power_2 + i_power_2 + i_power_2 + i_power_2); 
+	 convolvedSignal = (double *) malloc(i_power_2 + i_power_2 + i_power_2 + i_power_2); 
+	 output = (double *) malloc(i_power_2 + i_power_2 + i_power_2 + i_power_2); 
+	 
+	for (int i=0; i<i_power_2; i+=2)
+	{
+		convolvedResponse[i] = 0.0;
+		convolvedResponse[i+1] = 0.0;
+		convolvedSignal[i] = 0.0;
+		convolvedSignal[i+1] = 0.0;
+	}
+	 
+	 for(int j = 0; j < numOfSamples; j++)
+	 {
+		convolvedSignal[ j << 1 ] = signal[j];
+	 }
+	 	 
+	 for(int k = 0; k < sizeResponseArr; k++)
+	 {
+		convolvedResponse[ k << 1 ] = responseArr[k];
+		
+	 }
+	
+	 four1(convolvedResponse - 1, i_power, 1);
+	 four1(convolvedSignal - 1, i_power, 1);
+	
+	for(int m = 0 ; m < i_power; m ++)
+	{
+		output[ m << 1] = (convolvedSignal[m] * convolvedResponse[m]) - (convolvedSignal[m+1] * convolvedResponse[m + 1]);
+		output[ (m << 1) + 1] = (convolvedSignal[m+1] * convolvedResponse[m]) - (convolvedSignal[m+1] * convolvedResponse[m + 1]);	
+	}
+	
+	// Revert back
+	four1(output - 1, i_power, -1);
+	return output;
+}
 
 int saveWave(char* filename)
 {
@@ -282,22 +320,13 @@ int saveWave(char* filename)
 		int bytesPerSample = bitsPerSample / 8;
 		int sampleCount =  subChunk2Size / bytesPerSample;
 		
-		//impulse response - echo
-		int IRSize = 6;
-		/*float IR[IRSize];
-		IR[0] = 1.0;
-		IR[1] = 1.0;
-		IR[2] = 1.0;
-		IR[3] = 1.0;
-		IR[4] = 1.0;
-		IR[5] = 1.0;*/
-		
 		//write the data
 		double* newData = (double*) malloc(sizeof(double) * (numSamples+numSamplesIR-1));
 		double maxSample = -1;
 		double MAX_VAL = 32767.f;	//FIXME: find based on bits per sample
 		clock_t start=clock();
-		four1(newData, (int)numSamplesIR, (int)numSamples);		
+		four1(newData, (int)numSamplesIR, (int)numSamples);	
+		double* convolvedData= convolve_d((double*)data, (int)numSamples, (double*)dataIR, sizeof(dataIR)); 
 		/*for(int i=0; i<numSamples; ++i)
 		{			
 			//convolve
@@ -315,7 +344,7 @@ int saveWave(char* filename)
 		cout<<convolveTime;
 		cout<<" cycles\n"<<endl;
 		//scale and re write the data
-		for(int i=0; i<sampleCount + IRSize - 1; ++i)
+		for(int i=0; i<sampleCount + chunkSize; ++i)
 		{
 			newData[i] = (newData[i] / maxSample) ;
 			short sample = (short) (newData[i] * MAX_VAL);
