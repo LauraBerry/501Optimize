@@ -257,6 +257,7 @@ double * convolve_d(double signal[], int numOfSamples, double responseArr[], int
 		convolvedSignal[i] = 0.0;
 		convolvedSignal[i+1] = 0.0;
 	} 
+
 	 for(int j = 0; j < numOfSamples; j++)
 	 {
 		convolvedSignal[ j << 1 ] = signal[j];
